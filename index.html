@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporting Problems in Gezira Irrigation Scheme</title>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="https://unpkg.com/rbush@3/rbush.min.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <p class="load-text">Loading Gezira Irrigation Data&hellip;</p>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Title -->
+<div id="title-block">
+    <h1>Reporting Problems in Gezira</h1>
+    <h2>Number of reported incidents in the years 2021&ndash;2024</h2>
+</div>
+
+<!-- Category icons — NYC 311 style with pastel backgrounds -->
+<div id="category-bar">
+
+    <div class="cat-icon" data-cat="0">
+        <div class="cat-icon-box" style="background:rgba(198,122,46,0.15); border-color:rgba(198,122,46,0.30)">
+            <svg viewBox="0 0 40 40" width="30" height="30" fill="none" stroke="#C67A2E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6 C20 6 10 18 10 25a10 10 0 0 0 20 0C30 18 20 6 20 6z"/>
+                <line x1="14" y1="24" x2="26" y2="24" stroke-dasharray="2,2.5" stroke-width="1.5"/>
+                <line x1="15" y1="28" x2="25" y2="28" stroke-dasharray="2,2.5" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <span>Water<br>Shortage</span>
+    </div>
+
+    <div class="cat-icon" data-cat="1">
+        <div class="cat-icon-box" style="background:rgba(155,45,139,0.12); border-color:rgba(155,45,139,0.25)">
+            <svg viewBox="0 0 40 40" width="30" height="30" fill="none" stroke="#9B2D8B" stroke-width="2.2" stroke-linecap="round">
+                <circle cx="20" cy="20" r="12"/>
+                <line x1="14" y1="14" x2="26" y2="26"/>
+                <line x1="26" y1="14" x2="14" y2="26"/>
+                <path d="M8 30h24" stroke-width="2"/>
+                <path d="M10 34h20" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <span>Siltation</span>
+    </div>
+
+    <div class="cat-icon" data-cat="2">
+        <div class="cat-icon-box" style="background:rgba(192,57,43,0.12); border-color:rgba(192,57,43,0.25)">
+            <svg viewBox="0 0 40 40" width="30" height="30" fill="none" stroke="#C0392B" stroke-width="2.2" stroke-linecap="round">
+                <path d="M6 18 Q13 12 20 18 Q27 24 34 18"/>
+                <path d="M6 24 Q13 18 20 24 Q27 30 34 24"/>
+                <path d="M6 30 Q13 24 20 30 Q27 36 34 30"/>
+                <path d="M15 8 v6 M20 6 v8 M25 8 v6" stroke-width="1.5"/>
+            </svg>
+        </div>
+        <span>Water-<br>logging</span>
+    </div>
+
+    <div class="cat-icon" data-cat="3">
+        <div class="cat-icon-box" style="background:rgba(39,174,96,0.12); border-color:rgba(39,174,96,0.25)">
+            <svg viewBox="0 0 40 40" width="30" height="30" fill="none" stroke="#27AE60" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 10 L32 10 L30 30 L10 30z"/>
+                <path d="M14 30 L14 36 M26 30 L26 36"/>
+                <line x1="15" y1="18" x2="25" y2="22" stroke-width="2.5"/>
+                <line x1="15" y1="22" x2="25" y2="18" stroke-width="2.5"/>
+            </svg>
+        </div>
+        <span>Canal<br>Damage</span>
+    </div>
+
+    <div class="cat-icon" data-cat="4">
+        <div class="cat-icon-box" style="background:rgba(127,140,141,0.15); border-color:rgba(127,140,141,0.30)">
+            <svg viewBox="0 0 40 40" width="30" height="30" fill="none" stroke="#7F8C8D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M6 32 L16 14 L22 22 L30 8 L34 32z" fill="rgba(127,140,141,0.10)"/>
+                <path d="M6 32 L16 14 L22 22 L30 8 L34 32"/>
+                <line x1="6" y1="32" x2="34" y2="32" stroke-width="2.5"/>
+            </svg>
+        </div>
+        <span>Land<br>Degradation</span>
+    </div>
+
+    <div class="cat-hint">Drag onto map &middot; Drop on lens to combine &middot; Click <span style="color:#e74c3c">&#x2716;</span> to separate</div>
+</div>
+
+<!-- Radius slider -->
+<div id="radius-control">
+    <label for="radius-slider">Focus Radius</label>
+    <input type="range" id="radius-slider" min="5" max="50" value="15" step="1" />
+    <span id="radius-slider-val">15 km</span>
+</div>
+
+<!-- Export Button -->
+<button id="export-btn" title="Export Screenshot">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <path d="M21 15l-5-5L5 21"/>
+    </svg>
+</button>
+
+<!-- Heatmap Toggle -->
+<button id="heatmap-toggle" title="Toggle Problem Heatmap">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#e67e22" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2c0 6-8 9-8 15a8 8 0 0016 0c0-6-8-9-8-15z" fill="rgba(230,126,34,0.15)"/>
+        <path d="M12 9c0 3-4 4.5-4 7.5a4 4 0 008 0c0-3-4-4.5-4-7.5z" fill="rgba(230,126,34,0.25)"/>
+    </svg>
+</button>
+
+<!-- Search Box -->
+<div id="search-box">
+    <input type="text" id="search-input" placeholder="Search canals, divisions..." autocomplete="off" />
+    <div id="search-results" class="search-results"></div>
+</div>
+
+<!-- Comparison Panel -->
+<div id="comparison-panel">
+    <div class="comparison-header">
+        <h3>Area Comparison</h3>
+    </div>
+    <div id="comparison-content"></div>
+</div>
+
+<!-- Time Player -->
+<div id="time-player">
+    <button class="play-btn" id="play-btn" title="Play / Pause">
+        <svg viewBox="0 0 24 24" width="18" height="18"><polygon points="6,4 20,12 6,20" fill="#333"/></svg>
+    </button>
+    <div class="year-dots">
+        <span class="year-dot" data-year="2021">2021</span>
+        <span class="dot-sep">&middot;</span>
+        <span class="year-dot" data-year="2022">2022</span>
+        <span class="dot-sep">&middot;</span>
+        <span class="year-dot" data-year="2023">2023</span>
+        <span class="dot-sep">&middot;</span>
+        <span class="year-dot" data-year="2024">2024</span>
+    </div>
+    <span id="current-year-label"></span>
+</div>
+
+<!-- Dynamic lens container (lenses created by dragging icons here) -->
+<div id="lens-container"></div>
+
+<!-- Scripts -->
+<script src="js/config.js"></script>
+<script src="js/data-loader.js"></script>
+<script src="js/data-normalizer.js"></script>
+<script src="js/simulated-data.js"></script>
+<script src="js/spatial-index.js"></script>
+<script src="js/radial-chart.js"></script>
+<script src="js/lens.js"></script>
+<script src="js/map-layers.js"></script>
+<script src="js/ui-controls.js"></script>
+<script src="js/sparklines.js"></script>
+<script src="js/time-player.js"></script>
+<script src="js/heatmap.js"></script>
+<script src="js/search.js"></script>
+<script src="js/comparison.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
